@@ -18,20 +18,37 @@ interface ExpenseFormProps {
 }
 
 const categories = [
-  "Food", "Transport", "Entertainment", "Utilities",
-  "Healthcare", "Shopping", "Salary", "Freelance", "Other"
+  "Food",
+  "Transport",
+  "Entertainment",
+  "Utilities",
+  "Healthcare",
+  "Shopping",
+  "Salary",
+  "Freelance",
+  "Rent",
+  "Other",
 ];
 
 export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormProps) {
   const { toast } = useToast();
+
+  // ✅ normalize tags into array
+  const initTags: string[] = Array.isArray(editingExpense?.tags)
+    ? editingExpense!.tags
+    : typeof editingExpense?.tags === "string"
+    ? editingExpense!.tags.split(",").map((t) => t.trim())
+    : [];
+
   const [formData, setFormData] = useState({
     amount: editingExpense?.amount.toString() || "",
     description: editingExpense?.description || "",
     category: editingExpense?.category || "",
     date: editingExpense?.date || new Date().toISOString().split("T")[0],
     type: (editingExpense?.type || "expense") as "expense" | "income",
-    tags: editingExpense?.tags || []
+    tags: initTags, // ✅ always an array
   });
+
   const [newTag, setNewTag] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +58,7 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
       toast({
         title: "Error",
         description: "Please fill in all required fields",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -51,7 +68,7 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
       toast({
         title: "Error",
         description: "Please enter a valid amount",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -62,7 +79,7 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
       category: formData.category,
       date: formData.date,
       type: formData.type,
-      tags: formData.tags
+      tags: formData.tags, // ✅ guaranteed array
     });
 
     if (!editingExpense) {
@@ -72,36 +89,38 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
         category: "",
         date: new Date().toISOString().split("T")[0],
         type: "expense",
-        tags: []
+        tags: [],
       });
     }
 
     toast({
       title: "Success",
-      description: `${formData.type === "expense" ? "Expense" : "Income"} ${editingExpense ? "updated" : "added"} successfully`
+      description: `${
+        formData.type === "expense" ? "Expense" : "Income"
+      } ${editingExpense ? "updated" : "added"} successfully`,
     });
   };
 
   const addTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        tags: [...prev.tags, newTag.trim()]
+        tags: [...prev.tags, newTag.trim()],
       }));
       setNewTag("");
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
     }));
   };
 
   return (
     <Card className="relative w-full max-w-2xl mx-auto bg-gradient-to-br from-card to-card/50">
-      {/* Close button on top-right */}
+      {/* Close button */}
       {onCancel && (
         <Button
           variant="ghost"
@@ -119,26 +138,31 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
           {editingExpense ? "Edit Transaction" : "Add New Transaction"}
         </CardTitle>
       </CardHeader>
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* transaction type + amount */}
+          {/* Transaction type + amount */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">Transaction Type</Label>
               <RadioGroup
                 value={formData.type}
                 onValueChange={(value: "expense" | "income") =>
-                  setFormData(prev => ({ ...prev, type: value }))
+                  setFormData((prev) => ({ ...prev, type: value }))
                 }
                 className="flex gap-6"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="expense" id="expense" />
-                  <Label htmlFor="expense" className="text-expense font-medium">Expense</Label>
+                  <Label htmlFor="expense" className="text-expense font-medium">
+                    Expense
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="income" id="income" />
-                  <Label htmlFor="income" className="text-success font-medium">Income</Label>
+                  <Label htmlFor="income" className="text-success font-medium">
+                    Income
+                  </Label>
                 </div>
               </RadioGroup>
             </div>
@@ -151,34 +175,40 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
                 step="0.01"
                 placeholder="0.00"
                 value={formData.amount}
-                onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, amount: e.target.value }))
+                }
                 className="text-lg font-medium"
                 required
               />
             </div>
           </div>
 
-          {/* description */}
+          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               placeholder="What was this transaction for?"
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, description: e.target.value }))
+              }
               className="resize-none"
               rows={2}
               required
             />
           </div>
 
-          {/* category + date */}
+          {/* Category + date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Select
                 value={formData.category}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, category: value }))
+                }
                 required
               >
                 <SelectTrigger>
@@ -200,13 +230,15 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
                 id="date"
                 type="date"
                 value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, date: e.target.value }))
+                }
                 required
               />
             </div>
           </div>
 
-          {/* tags */}
+          {/* Tags */}
           <div className="space-y-2">
             <Label>Tags (Optional)</Label>
             <div className="flex gap-2">
@@ -223,7 +255,11 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
             {formData.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {formData.tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                  <Badge
+                    key={index}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
                     #{tag}
                     <Button
                       type="button"
@@ -240,9 +276,12 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
             )}
           </div>
 
-          {/* actions */}
+          {/* Actions */}
           <div className="flex gap-2 pt-4">
-            <Button type="submit" className="flex-1 bg-gradient-to-r from-primary to-primary/80">
+            <Button
+              type="submit"
+              className="flex-1 bg-gradient-to-r from-primary to-primary/80"
+            >
               {editingExpense ? "Update Transaction" : "Add Transaction"}
             </Button>
             {editingExpense && (

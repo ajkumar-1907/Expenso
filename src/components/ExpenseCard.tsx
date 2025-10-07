@@ -11,7 +11,7 @@ export interface Expense {
   category: string;
   date: string;
   type: "expense" | "income";
-  tags?: string[];
+  tags?: string[] | string | null; // ✅ allow array, string, or null
 }
 
 interface ExpenseCardProps {
@@ -30,11 +30,31 @@ const categoryColors: Record<string, string> = {
   shopping: "bg-pink-500/20 text-pink-400 border-pink-500/30",
   salary: "bg-green-500/20 text-green-400 border-green-500/30",
   freelance: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  rent: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   other: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 export function ExpenseCard({ expense, onEdit, onDelete, onClose }: ExpenseCardProps) {
   const isIncome = expense.type === "income";
+
+  // ✅ Safe category
+  const categoryClass =
+    categoryColors[expense.category?.toLowerCase() || "other"] || categoryColors.other;
+
+  // ✅ Safe date
+  let formattedDate = "";
+  try {
+    formattedDate = expense.date ? new Date(expense.date).toLocaleDateString() : "";
+  } catch {
+    formattedDate = "";
+  }
+
+  // ✅ Normalize tags into array
+  const tags: string[] = Array.isArray(expense.tags)
+    ? expense.tags
+    : typeof expense.tags === "string"
+    ? expense.tags.split(",").map((t) => t.trim())
+    : [];
 
   return (
     <Card className="group relative hover:shadow-md transition-all duration-200 bg-gradient-to-r from-card to-card/50 border-border/50">
@@ -53,29 +73,24 @@ export function ExpenseCard({ expense, onEdit, onDelete, onClose }: ExpenseCardP
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
+            {/* Description */}
             <div className="flex items-center gap-2 mb-2">
               <Receipt className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium text-foreground">{expense.description}</span>
             </div>
 
+            {/* Category + Date */}
             <div className="flex items-center gap-2 mb-2">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-xs border",
-                  categoryColors[expense.category.toLowerCase()] || categoryColors.other
-                )}
-              >
-                {expense.category}
+              <Badge variant="outline" className={cn("text-xs border", categoryClass)}>
+                {expense.category || "Other"}
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                {new Date(expense.date).toLocaleDateString()}
-              </span>
+              <span className="text-sm text-muted-foreground">{formattedDate}</span>
             </div>
 
-            {expense.tags && expense.tags.length > 0 && (
+            {/* Tags */}
+            {tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
-                {expense.tags.map((tag, index) => (
+                {tags.map((tag, index) => (
                   <Badge key={index} variant="secondary" className="text-xs">
                     #{tag}
                   </Badge>
@@ -84,6 +99,7 @@ export function ExpenseCard({ expense, onEdit, onDelete, onClose }: ExpenseCardP
             )}
           </div>
 
+          {/* Amount + Actions */}
           <div className="flex items-center gap-2">
             <div className="text-right">
               <div

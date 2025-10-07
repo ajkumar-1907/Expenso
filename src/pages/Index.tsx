@@ -1,9 +1,16 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BarChart3, Wallet, TrendingUp, Download, Settings } from "lucide-react";
+import {
+  Plus,
+  BarChart3,
+  Wallet,
+  TrendingUp,
+  Download,
+} from "lucide-react";
 import { ExpenseCard, type Expense } from "@/components/ExpenseCard";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { ExpenseStats } from "@/components/ExpenseStats";
@@ -11,216 +18,303 @@ import { ExpenseCharts } from "@/components/ExpenseCharts";
 import { ExpenseFilters, type FilterOptions } from "@/components/ExpenseFilters";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/assets/logo.png";
+import AuthPage from "./Auth";
 
-// Sample data for demonstration
-const sampleExpenses: Expense[] = [
-  {
-    id: "1",
-    amount: 850,
-    description: "This is juat a sample input. Grocery shopping at BigBasket",
-    category: "Food",
-    date: "2024-10-03",
-    type: "expense",
-    tags: ["essentials", "monthly"]
-  },
-  // {
-  //   id: "2",
-  //   amount: 45000,
-  //   description: "Freelance project payment",
-  //   category: "Freelance",
-  //   date: "2024-01-10",
-  //   type: "income",
-  //   tags: ["work", "client-a"]
-  // },
-  // {
-  //   id: "3",
-  //   amount: 1200,
-  //   description: "Netflix and Spotify subscriptions",
-  //   category: "Entertainment",
-  //   date: "2024-01-08",
-  //   type: "expense",
-  //   tags: ["subscriptions", "monthly"]
-  // },
-  // {
-  //   id: "4",
-  //   amount: 2500,
-  //   description: "Electricity bill",
-  //   category: "Utilities",
-  //   date: "2024-01-05",
-  //   type: "expense",
-  //   tags: ["bills", "monthly"]
-  // }
-];
+// ✅ Normalizer function (safe tags handling)
+function normalizeExpense(exp: any): Expense {
+  return {
+    id: exp.id,
+    amount: exp.amount,
+    description: exp.description,
+    category: exp.category || "Other",
+    date: exp.date ? exp.date.split("T")[0] : "", // only YYYY-MM-DD
+    type: exp.type === "income" ? "income" : "expense",
+    tags: Array.isArray(exp.tags)
+      ? exp.tags
+      : typeof exp.tags === "string" && exp.tags.length > 0
+      ? exp.tags.split(",").map((t) => t.trim())
+      : [], // ✅ always an array
+  };
+}
 
 const Index = () => {
   const { toast } = useToast();
-  const [expenses, setExpenses] = useState<Expense[]>(sampleExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [filters, setFilters] = useState<FilterOptions>({
-    search: '',
-    category: '',
-    type: '',
-    dateFrom: '',
-    dateTo: '',
-    minAmount: '',
-    maxAmount: '',
-    tags: []
+    search: "",
+    category: "",
+    type: "",
+    dateFrom: "",
+    dateTo: "",
+    minAmount: "",
+    maxAmount: "",
+    tags: [],
   });
+
+  // auth state
+  const [user, setUser] = useState<any>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   // Ref for scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Sample budgets
+  // Budgets (could later come from DB)
   const budgets = {
     Food: 15000,
     Transport: 5000,
     Entertainment: 3000,
-    Utilities: 8000
+    Utilities: 8000,
   };
 
-  // Filter expenses based on current filters
+  // -----------------------
+  // Auth check
+  // -----------------------
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setLoadingUser(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // -----------------------
+  // Fetch expenses for logged-in user
+  // -----------------------
+  useEffect(() => {
+    if (!user) return;
+    const fetchExpenses = async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching:", error.message);
+        toast({ title: "Error", description: "Failed to fetch expenses" });
+      } else {
+        setExpenses((data || []).map(normalizeExpense));
+      }
+    };
+
+    fetchExpenses();
+  }, [user, toast]);
+
+  // -----------------------
+  // Filter logic
+  // -----------------------
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(expense => {
-      // Search filter
-      if (filters.search && !expense.description.toLowerCase().includes(filters.search.toLowerCase())) {
+    return expenses.filter((expense) => {
+      if (
+        filters.search &&
+        !expense.description
+          .toLowerCase()
+          .includes(filters.search.toLowerCase())
+      ) {
         return false;
       }
-
-      // Category filter
       if (filters.category && expense.category !== filters.category) {
         return false;
       }
-
-      // Type filter
       if (filters.type && expense.type !== filters.type) {
         return false;
       }
-
-      // Date range filter
-      if (filters.dateFrom && new Date(expense.date) < new Date(filters.dateFrom)) {
+      if (
+        filters.dateFrom &&
+        new Date(expense.date) < new Date(filters.dateFrom)
+      ) {
         return false;
       }
       if (filters.dateTo && new Date(expense.date) > new Date(filters.dateTo)) {
         return false;
       }
-
-      // Amount range filter
-      if (filters.minAmount && expense.amount < parseFloat(filters.minAmount)) {
+      if (
+        filters.minAmount &&
+        expense.amount < parseFloat(filters.minAmount)
+      ) {
         return false;
       }
-      if (filters.maxAmount && expense.amount > parseFloat(filters.maxAmount)) {
+      if (
+        filters.maxAmount &&
+        expense.amount > parseFloat(filters.maxAmount)
+      ) {
         return false;
       }
-
-      // Tags filter
-      if (filters.tags.length > 0 && !filters.tags.some(tag => expense.tags?.includes(tag))) {
+      if (
+        filters.tags.length > 0 &&
+        !filters.tags.some((tag) => expense.tags?.includes(tag))
+      ) {
         return false;
       }
-
       return true;
     });
   }, [expenses, filters]);
 
-  // Get available categories and tags for filters
-  const availableCategories = [...new Set(expenses.map(e => e.category))];
-  const availableTags = [...new Set(expenses.flatMap(e => e.tags || []))];
+  const availableCategories = [...new Set(expenses.map((e) => e.category))];
+  const availableTags = [...new Set(expenses.flatMap((e) => e.tags || []))];
 
-  const handleAddExpense = (expenseData: Omit<Expense, 'id'>) => {
-    const newExpense: Expense = {
-      ...expenseData,
-      id: Date.now().toString()
-    };
-    setExpenses(prev => [newExpense, ...prev]);
-    setShowAddForm(false);
+  // -----------------------
+  // Add new expense
+  // -----------------------
+  const handleAddExpense = async (expenseData: Omit<Expense, "id">) => {
+    if (!user) {
+      toast({ title: "Error", description: "Login required" });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("transactions")
+      .insert([{ ...expenseData, user_id: user.id }])
+      .select();
+
+    if (error) {
+      toast({ title: "Error", description: error.message });
+    } else {
+      const inserted = data![0];
+      setExpenses((prev) => [normalizeExpense(inserted), ...prev]);
+      setShowAddForm(false);
+      toast({ title: "Success", description: "Transaction added!" });
+    }
   };
 
-  const handleEditExpense = (expenseData: Omit<Expense, 'id'>) => {
+  // -----------------------
+  // Edit expense
+  // -----------------------
+  const handleEditExpense = async (expenseData: Omit<Expense, "id">) => {
     if (!editingExpense) return;
-    
-    setExpenses(prev =>
-      prev.map(expense =>
-        expense.id === editingExpense.id
-          ? { ...expenseData, id: editingExpense.id }
-          : expense
-      )
-    );
-    setEditingExpense(null);
+
+    const { data, error } = await supabase
+      .from("transactions")
+      .update(expenseData)
+      .eq("id", editingExpense.id)
+      .select();
+
+    if (error) {
+      toast({ title: "Error", description: error.message });
+    } else {
+      const updated = data![0];
+      setExpenses((prev) =>
+        prev.map((exp) =>
+          exp.id === editingExpense.id ? normalizeExpense(updated) : exp
+        )
+      );
+      setEditingExpense(null);
+      toast({ title: "Updated", description: "Transaction updated!" });
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(prev => prev.filter(expense => expense.id !== id));
-    toast({
-      title: "Deleted",
-      description: "Transaction deleted successfully",
-    });
+  // -----------------------
+  // Delete expense
+  // -----------------------
+  const handleDeleteExpense = async (id: string) => {
+    const { error } = await supabase.from("transactions").delete().eq("id", id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message });
+    } else {
+      setExpenses((prev) => prev.filter((exp) => exp.id !== id));
+      toast({ title: "Deleted", description: "Transaction deleted!" });
+    }
   };
 
+  // -----------------------
+  // Export to CSV
+  // -----------------------
   const exportToCsv = () => {
-    const headers = ['Date', 'Type', 'Category', 'Description', 'Amount', 'Tags'];
+    const headers = [
+      "Date",
+      "Type",
+      "Category",
+      "Description",
+      "Amount",
+      "Tags",
+    ];
     const csvData = [
       headers,
-      ...filteredExpenses.map(expense => [
+      ...filteredExpenses.map((expense) => [
         expense.date,
         expense.type,
         expense.category,
         expense.description,
         expense.amount.toString(),
-        expense.tags?.join(';') || ''
-      ])
+        Array.isArray(expense.tags) ? expense.tags.join(";") : "",// ✅ Safe join
+      ]),
     ];
-    
-    const csvContent = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+
+    const csvContent = csvData.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'expenses.csv';
+    a.download = "expenses.csv";
     a.click();
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Exported",
       description: "Transactions exported to CSV successfully",
     });
   };
 
-  // Function to handle scroll when editing
+  // -----------------------
+  // Scroll for editing
+  // -----------------------
   const handleEditClick = (expense: Expense) => {
     setEditingExpense(expense);
     setShowAddForm(false);
     setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50); // slight delay to ensure form renders
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
+
+  // -----------------------
+  // Render
+  // -----------------------
+  if (loadingUser)
+    return <p className="text-center p-6 text-white">Loading...</p>;
+  if (!user) return <AuthPage />; // redirect to login if not logged in
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
-            <div>
-              <img src={Logo} alt="App Logo" className="h-8 w-8" />
-            </div>
+            <img src={Logo} alt="App Logo" className="h-8 w-8" />
             <div>
               <h1 className="text-xl font-bold">ExpenseTracker</h1>
               <p className="text-sm text-muted-foreground">Manage your finances</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={exportToCsv}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button 
+            <Button
               onClick={() => setShowAddForm(true)}
               className="bg-gradient-to-r from-primary to-primary/80"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => await supabase.auth.signOut()}
+            >
+              Logout
             </Button>
           </div>
         </div>
@@ -241,7 +335,7 @@ const Index = () => {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -258,11 +352,11 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
+          {/* Overview */}
           <TabsContent value="overview" className="space-y-6">
             <ExpenseStats expenses={expenses} budgets={budgets} />
             <ExpenseCharts expenses={expenses} />
-            
-            {/* Recent Transactions */}
+
             <Card>
               <CardHeader>
                 <CardTitle>Recent Transactions</CardTitle>
@@ -282,6 +376,7 @@ const Index = () => {
             </Card>
           </TabsContent>
 
+          {/* Transactions */}
           <TabsContent value="transactions" className="space-y-6">
             <ExpenseFilters
               filters={filters}
@@ -315,10 +410,9 @@ const Index = () => {
                     <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium mb-2">No transactions found</h3>
                     <p className="text-muted-foreground mb-4">
-                      {expenses.length === 0 
-                        ? "Start by adding your first transaction" 
-                        : "Try adjusting your filters"
-                      }
+                      {expenses.length === 0
+                        ? "Start by adding your first transaction"
+                        : "Try adjusting your filters"}
                     </p>
                     <Button onClick={() => setShowAddForm(true)}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -330,6 +424,7 @@ const Index = () => {
             </div>
           </TabsContent>
 
+          {/* Analytics */}
           <TabsContent value="analytics" className="space-y-6">
             <ExpenseStats expenses={expenses} budgets={budgets} />
             <ExpenseCharts expenses={expenses} />

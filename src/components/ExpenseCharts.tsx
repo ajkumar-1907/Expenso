@@ -13,7 +13,7 @@ const COLORS = [
 ];
 
 export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
-  // Monthly spending trend (last 6 months)
+  //monthly spending trend (last 6 months)
   const monthlyData = (() => {
     const months = eachMonthOfInterval({
       start: subMonths(new Date(), 5),
@@ -43,7 +43,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     });
   })();
 
-  // Category breakdown (current month)
+  //category breakdown (current month)
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   

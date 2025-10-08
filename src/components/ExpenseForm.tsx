@@ -33,7 +33,7 @@ const categories = [
 export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormProps) {
   const { toast } = useToast();
 
-  // ✅ normalize tags into array
+
   const initTags: string[] = Array.isArray(editingExpense?.tags)
     ? editingExpense!.tags
     : typeof editingExpense?.tags === "string"
@@ -46,7 +46,7 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
     category: editingExpense?.category || "",
     date: editingExpense?.date || new Date().toISOString().split("T")[0],
     type: (editingExpense?.type || "expense") as "expense" | "income",
-    tags: initTags, // ✅ always an array
+    tags: initTags,
   });
 
   const [newTag, setNewTag] = useState("");
@@ -79,7 +79,7 @@ export function ExpenseForm({ onSubmit, editingExpense, onCancel }: ExpenseFormP
       category: formData.category,
       date: formData.date,
       type: formData.type,
-      tags: formData.tags, // ✅ guaranteed array
+      tags: formData.tags,
     });
 
     if (!editingExpense) {

@@ -19,21 +19,24 @@ import { ExpenseFilters, type FilterOptions } from "@/components/ExpenseFilters"
 import { useToast } from "@/hooks/use-toast";
 import Logo from "@/assets/logo.png";
 import AuthPage from "./Auth";
+import Preloader from "@/components/PreLoader";
 
-// ✅ Normalizer function (safe tags handling)
+
+
+
 function normalizeExpense(exp: any): Expense {
   return {
     id: exp.id,
     amount: exp.amount,
     description: exp.description,
     category: exp.category || "Other",
-    date: exp.date ? exp.date.split("T")[0] : "", // only YYYY-MM-DD
+    date: exp.date ? exp.date.split("T")[0] : "",
     type: exp.type === "income" ? "income" : "expense",
     tags: Array.isArray(exp.tags)
       ? exp.tags
       : typeof exp.tags === "string" && exp.tags.length > 0
       ? exp.tags.split(",").map((t) => t.trim())
-      : [], // ✅ always an array
+      : [],
   };
 }
 
@@ -58,7 +61,7 @@ const Index = () => {
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // Ref for scrolling to form
+
   const formRef = useRef<HTMLDivElement>(null);
 
   // Budgets (could later come from DB)
@@ -69,9 +72,8 @@ const Index = () => {
     Utilities: 8000,
   };
 
-  // -----------------------
   // Auth check
-  // -----------------------
+ 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
@@ -87,9 +89,8 @@ const Index = () => {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // -----------------------
+
   // Fetch expenses for logged-in user
-  // -----------------------
   useEffect(() => {
     if (!user) return;
     const fetchExpenses = async () => {
@@ -110,9 +111,7 @@ const Index = () => {
     fetchExpenses();
   }, [user, toast]);
 
-  // -----------------------
   // Filter logic
-  // -----------------------
   const filteredExpenses = useMemo(() => {
     return expenses.filter((expense) => {
       if (
@@ -163,9 +162,8 @@ const Index = () => {
   const availableCategories = [...new Set(expenses.map((e) => e.category))];
   const availableTags = [...new Set(expenses.flatMap((e) => e.tags || []))];
 
-  // -----------------------
+
   // Add new expense
-  // -----------------------
   const handleAddExpense = async (expenseData: Omit<Expense, "id">) => {
     if (!user) {
       toast({ title: "Error", description: "Login required" });
@@ -187,9 +185,7 @@ const Index = () => {
     }
   };
 
-  // -----------------------
   // Edit expense
-  // -----------------------
   const handleEditExpense = async (expenseData: Omit<Expense, "id">) => {
     if (!editingExpense) return;
 
@@ -213,9 +209,8 @@ const Index = () => {
     }
   };
 
-  // -----------------------
+
   // Delete expense
-  // -----------------------
   const handleDeleteExpense = async (id: string) => {
     const { error } = await supabase.from("transactions").delete().eq("id", id);
 
@@ -227,9 +222,8 @@ const Index = () => {
     }
   };
 
-  // -----------------------
+
   // Export to CSV
-  // -----------------------
   const exportToCsv = () => {
     const headers = [
       "Date",
@@ -266,9 +260,7 @@ const Index = () => {
     });
   };
 
-  // -----------------------
-  // Scroll for editing
-  // -----------------------
+
   const handleEditClick = (expense: Expense) => {
     setEditingExpense(expense);
     setShowAddForm(false);
@@ -277,11 +269,8 @@ const Index = () => {
     }, 50);
   };
 
-  // -----------------------
-  // Render
-  // -----------------------
   if (loadingUser)
-    return <p className="text-center p-6 text-white">Loading...</p>;
+    return <Preloader />;
   if (!user) return <AuthPage />; // redirect to login if not logged in
 
   return (

@@ -11,14 +11,14 @@ export interface Expense {
   category: string;
   date: string;
   type: "expense" | "income";
-  tags?: string[] | string | null; // ✅ allow array, string, or null
+  tags?: string[] | string | null;
 }
 
 interface ExpenseCardProps {
   expense: Expense;
   onEdit?: (expense: Expense) => void;
   onDelete?: (id: string) => void;
-  onClose?: (id: string) => void; // optional close button
+  onClose?: (id: string) => void;
 }
 
 const categoryColors: Record<string, string> = {
@@ -37,11 +37,9 @@ const categoryColors: Record<string, string> = {
 export function ExpenseCard({ expense, onEdit, onDelete, onClose }: ExpenseCardProps) {
   const isIncome = expense.type === "income";
 
-  // ✅ Safe category
   const categoryClass =
     categoryColors[expense.category?.toLowerCase() || "other"] || categoryColors.other;
 
-  // ✅ Safe date
   let formattedDate = "";
   try {
     formattedDate = expense.date ? new Date(expense.date).toLocaleDateString() : "";
@@ -49,7 +47,6 @@ export function ExpenseCard({ expense, onEdit, onDelete, onClose }: ExpenseCardP
     formattedDate = "";
   }
 
-  // ✅ Normalize tags into array
   const tags: string[] = Array.isArray(expense.tags)
     ? expense.tags
     : typeof expense.tags === "string"
